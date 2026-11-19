@@ -1,0 +1,48 @@
+<mujoco model="Robot_Leg_Left-v7">
+    <compiler angle="radian" eulerseq="XYZ" inertiafromgeom="false" />
+    <option timestep="0.002" integrator="implicitfast" />
+    <asset>
+        <mesh name="mg996R_v2-v2_1" file="meshes/mg996R_v2-v2_1.stl" scale="0.001 0.001 0.001" />
+        <mesh name="lower_leg_1" file="meshes/lower_leg_1.stl" scale="0.001 0.001 0.001" />
+        <mesh name="horn_1" file="meshes/horn_1.stl" scale="0.001 0.001 0.001" />
+        <mesh name="linkage_1" file="meshes/linkage_1.stl" scale="0.001 0.001 0.001" />
+        <mesh name="upper_leg_1" file="meshes/upper_leg_1.stl" scale="0.001 0.001 0.001" />
+        <mesh name="mg996_arm_round-v1_1" file="meshes/mg996_arm_round-v1_1.stl" scale="0.001 0.001 0.001" />
+    </asset>
+    <worldbody>
+        <light directional="true" pos="-0.5 0.5 3" dir="0 0 -1" />
+        <body name="upper_leg_1" pos="0.0 0.0 0.0" euler="0.0 -0.0 0.0">
+            <geom name="upper_leg_1_geom" type="mesh" mesh="upper_leg_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+            <inertial mass="0.4419474232985977" pos="0.01883059321306093 -0.014987322164693584 -0.0057900816079736305" fullinertia="0.0003118803323057456 0.0002611591784302717 0.0004968082108242125 0.00018751027270567849 3.7079870239719033e-06 -3.7282374011510876e-06" />
+            <body name="mg996R_v2-v2_1" pos="3.843037626437931e-06 -4.186589297506609e-06 -0.021000199999999997" euler="-7.850462293418886e-17 7.756589751644259e-32 2.3561944901923466">
+                <geom name="mg996R_v2-v2_1_geom" type="mesh" mesh="mg996R_v2-v2_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+                <inertial mass="0.24706042811521742" pos="-0.009755668448280153 1.0833895723256496e-09 -0.008850505239192176" fullinertia="3.810251791334708e-05 6.500656075249136e-05 4.314290022180704e-05 2.256107379775283e-11 -1.5247778319845517e-07 -4.7312332258502646e-12" />
+                <body name="mg996_arm_round-v1_1" pos="5.677803648316272e-06 -2.429277163040749e-07 0.0165002" euler="0.0 3.610187651972828e-33 6.089281537080233e-48">
+                    <geom name="mg996_arm_round-v1_1_geom" type="mesh" mesh="mg996_arm_round-v1_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+                    <inertial mass="0.006838616865849774" pos="-5.695993122161681e-14 -2.0390674697571022e-17 0.0009179644213399901" fullinertia="1.833288946348968e-07 1.8332889306587134e-07 3.4718926728399253e-07 2.779326858177786e-22 4.927275210430404e-19 -2.5873340283619016e-22" />
+                    <body name="horn_1" pos="-3.140184917367543e-19 1.7856580226006228e-18 0.0045" euler="-5.551115123125785e-17 5.551115123125786e-17 -2.3561944901923466">
+                        <joint name="servo_horn" type="hinge" axis="0.0 0.0 -1.0" pos="0.0 0.0 0.0" range="-0.610865 0.959931" limited="true" damping="0.05" />
+                        <geom name="horn_1_geom" type="mesh" mesh="horn_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+                        <inertial mass="0.020498553244113406" pos="-0.006168068897863606 -0.0061680688984686515 -0.00209297528389443" fullinertia="1.989344393030017e-06 1.9813539835369607e-06 3.8865174140414706e-06 -1.103419863248949e-06 -5.1462775914079437e-08 -5.146277593015173e-08" />
+                        <body name="linkage_1" pos="0.0 0.0 0.0" euler="0.0 -0.0 0.0">
+                            <joint name="horn_linkage" type="hinge" axis="0.0 0.0 1.0" pos="-0.021213 -0.021213 0.0" damping="0.05" />
+                            <geom name="linkage_1_geom" type="mesh" mesh="linkage_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+                            <inertial mass="0.039293848559891036" pos="0.007071011893510876 -0.049497928676351874 -0.006648345959145453" fullinertia="1.541690233711684e-05 1.5416948158244355e-05 3.023716064620641e-05 1.4819280604264119e-05 -9.468468425565492e-12 5.7585351446665036e-11" />
+                        </body>
+                    </body>
+                </body>
+            </body>
+            <body name="lower_leg_1" pos="0.0 0.0 0.0" euler="0.0 -0.0 0.0">
+                <joint name="upper_lower" type="hinge" axis="0.0 0.0 1.0" pos="0.056569 -0.056569 0.008" damping="0.05" />
+                <geom name="lower_leg_1_geom" type="mesh" mesh="lower_leg_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+                <inertial mass="0.06070007529804777" pos="0.08277039263648515 -0.030367612095525298 -0.002499941770839316" fullinertia="3.246870146012415e-05 3.2470501799771974e-05 6.400403752523346e-05 -3.119271163781527e-05 1.6800213325203288e-11 6.844574731175565e-12" />
+            </body>
+        </body>
+    </worldbody>
+    <equality>
+        <connect body1="linkage_1" body2="lower_leg_1" anchor="0.035355 -0.077782 0" solref="0.005 1"/>
+    </equality>
+    <actuator>
+        <position name="servo" joint="servo_horn" kp="5" kv="0.2" ctrlrange="-0.61 0.96" ctrllimited="true"/>
+    </actuator>
+</mujoco>
