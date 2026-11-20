@@ -1,6 +1,10 @@
 <mujoco model="Main_Robot-v8">
     <compiler angle="radian" eulerseq="XYZ" inertiafromgeom="false" />
     <option timestep="0.002" integrator="implicitfast" />
+    <!-- added so stuff doesn't flop around -->
+    <default>
+        <joint damping="0.05" armature="0.002"/>
+    </default>
     <asset>
         <mesh name="DC-DC-Converter-v2-v1_1" file="meshes/DC-DC-Converter-v2-v1_1.stl" scale="0.001 0.001 0.001" />
         <mesh name="Mini-Red-v1_1" file="meshes/Mini-Red-v1_1.stl" scale="0.001 0.001 0.001" />
@@ -286,4 +290,31 @@
             </body>
         </body>
     </worldbody>
+    <equality>
+        <!-- front-left-ish leg (upper_leg_1) -->
+        <connect body1="linkage_1"   body2="lower_leg_1"   anchor="0.035356 -0.077781 0" solref="0.005 1"/>
+        <!-- upper_leg-1 -->
+        <connect body1="linkage-1_1" body2="lower_leg-1_1" anchor="0.035356 -0.077781 0" solref="0.005 1"/>
+        <!-- upper_leg-2 -->
+        <connect body1="linkage-2_1" body2="lower_leg-2_1" anchor="0.077782 -0.035356 0" solref="0.005 1"/>
+        <!-- upper_leg-3 -->
+        <connect body1="linkage-3_1" body2="lower_leg-3_1" anchor="0.077782 -0.035356 0" solref="0.005 1"/>
+    </equality>
+    <actuator>
+        <!-- abduction (hip connector) -->
+        <position name="abd_1" joint="Revolute-16" kp="5" kv="0.2" forcerange="-0.6 0.6"/>
+        <position name="abd_2" joint="Revolute-17" kp="5" kv="0.2" forcerange="-0.6 0.6"/>
+        <position name="abd_3" joint="Revolute-22" kp="5" kv="0.2" forcerange="-0.6 0.6"/>
+        <position name="abd_4" joint="Revolute-23" kp="5" kv="0.2" forcerange="-0.6 0.6"/>
+        <!-- hip pitch (upper leg) -->
+        <position name="hip_1" joint="Revolute-28" kp="5" kv="0.2" forcerange="-0.6 0.6"/>
+        <position name="hip_2" joint="Revolute-34" kp="5" kv="0.2" forcerange="-0.6 0.6"/>
+        <position name="hip_3" joint="Revolute-35" kp="5" kv="0.2" forcerange="-0.6 0.6"/>
+        <position name="hip_4" joint="Revolute-36" kp="5" kv="0.2" forcerange="-0.6 0.6"/>
+        <!-- knee servo (horn) -->
+        <position name="knee_1" joint="Revolute-31" kp="5" kv="0.2" forcerange="-0.6 0.6" ctrlrange="-0.96 0.61" ctrllimited="true"/>
+        <position name="knee_2" joint="Revolute-43" kp="5" kv="0.2" forcerange="-0.6 0.6" ctrlrange="-0.96 0.61" ctrllimited="true"/>
+        <position name="knee_3" joint="Revolute-46" kp="5" kv="0.2" forcerange="-0.6 0.6" ctrlrange="-0.61 0.96" ctrllimited="true"/>
+        <position name="knee_4" joint="Revolute-49" kp="5" kv="0.2" forcerange="-0.6 0.6" ctrlrange="-0.61 0.96" ctrllimited="true"/>
+    </actuator>
 </mujoco>
