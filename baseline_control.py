@@ -39,30 +39,35 @@ LEFT = {"A", "D"}
 # Get mujoco's representation of the actuators
 act = {m.joint(m.actuator_trnid[i, 0]).name: i for i in range(m.nu)}
 
-
-# Basically the walking algorithm (right now just straight forward)
-def trot(t, x, y, freq=2.0, hip_amp=0.25, knee_amp=0.35, deadzone=0.08):
+# The algorithm the baseline will use to walk
+# OpenCV will give it a direction and this computes it
+def trot(t, x, y, freq=2.0, hip_amp=0.25, knee_amp=0.35):
     """x: -1 (left) .. +1 (right), y: -1 (back) .. +1 (forward)."""
-    # circular clamp, so diagonals on a keyboard don't exceed full stick
+    # clamp so we stay at a max speed of 1 on diagonals
     r = np.hypot(x, y)
     if r > 1.0:
         x, y = x / r, y / r
-    if r < deadzone:
-        x = y = 0.0
 
-    # arcade mixing: pushing right makes the left side stride more, so it turns right
-    side = {True: y + x, False: y - x}                     # True = left side
-    peak = max(1.0, abs(side[True]), abs(side[False]))     # keep the ratio, cap at 1
+    # If we want to turn left, make the right side move farther, and vice versa
+    # If side is true we go left
+    side = {True: y + x, False: y - x}
+    peak = max(1.0, abs(side[True]), abs(side[False]))
     side = {k: v / peak for k, v in side.items()}
 
     ctrl = np.zeros(m.nu)
-    for leg, (h, k, hs, ks, pair) in LEGS.items():
+    for leg, (hip, knee, hip_dir, knee_dir, pair) in LEGS.items():
         scale = side[leg in LEFT]
         phase = 2*np.pi*freq*t + pair*np.pi
-        lift = min(1.0, 3*abs(scale))                      # stand still on a zeroed side
-        swing = max(0.0, np.cos(phase))   # reversed stride swings on the other half
-        ctrl[act[h]] = hs * hip_amp * scale * np.sin(phase)
-        ctrl[act[k]] = ks * knee_amp * lift * swing
+
+        # How much to lift leg in walk
+        lift = min(1.0, 3*abs(scale))
+
+        # How much to move forward/backwards
+        swing = max(0.0, np.cos(phase)) 
+
+        # Calculate new positions based on this
+        ctrl[act[hip]] = hip_dir * hip_amp * scale * np.sin(phase)
+        ctrl[act[knee]] = knee_dir * knee_amp * lift * swing
     return ctrl
 
 def read_stick():
@@ -94,6 +99,7 @@ with mujoco.viewer.launch_passive(m, d) as v:
             cv2.imshow("far", far_r.render()[:, :, ::-1])
             cv2.waitKey(1)   
 
+        # Update frame visually every 25 steps to compute faster 
         step += 1
         if step % 25 == 0:
             v.sync()
