@@ -4,10 +4,6 @@ import numpy as np
 import time
 import cv2
 
-import pygame
-pygame.init(); pygame.joystick.init()
-pad = pygame.joystick.Joystick(0)
-
 # Load in the default scene, and create a data object to hold the current scene state
 m = mujoco.MjModel.from_xml_path("classroom.xml")
 d = mujoco.MjData(m)
@@ -25,6 +21,10 @@ FAR_EVERY     = int(1/30 / m.opt.timestep)
 # Physical frame we are on so we know whether to update
 step = 0
 
+# Distance in metres we want the ball to be away from the camera ideally
+# For now try setting to 15cm
+BALL_OPTIM_DIST = 0.15 
+
 # The legs were exported a bit weird from Fusion 360
 # This just defines the hip joint, knee joint, and relative joint directions for each
 LEGS = {
@@ -41,7 +41,7 @@ act = {m.joint(m.actuator_trnid[i, 0]).name: i for i in range(m.nu)}
 
 # The algorithm the baseline will use to walk
 # OpenCV will give it a direction and this computes it
-def trot(t, x, y, freq=2.0, hip_amp=0.25, knee_amp=0.35):
+def trot(t, x, y, freq=2.0, hip_amp=0.35, knee_amp=0.45):
     """x: -1 (left) .. +1 (right), y: -1 (back) .. +1 (forward)."""
     # clamp so we stay at a max speed of 1 on diagonals
     r = np.hypot(x, y)
@@ -70,20 +70,98 @@ def trot(t, x, y, freq=2.0, hip_amp=0.25, knee_amp=0.35):
         ctrl[act[knee]] = knee_dir * knee_amp * lift * swing
     return ctrl
 
-def read_stick():
-    pygame.event.pump()
-    return pad.get_axis(0), -pad.get_axis(1)    
+# Given the frame, give a cardinal direction for where we need to go
+# Forward if we need to get closer or are tracking well, backwards
+# if we are too close
+def find_ball(frame):
+    # We first need to find the ball within the frame
+    frame_hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
 
-stick = np.zeros(2)
+    # Since red hues wrap the spectrum we need to define two sections in which a valid ball could be found
+    mask = cv2.inRange(frame_hsv, (0, 120, 70), (10, 255, 255)) | cv2.inRange(frame_hsv, (170, 120, 70), (180, 255, 255))
+
+    # Find contours (blobs that could possibly be the ball)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+
+    # Biggest one is what we will consider the ball
+    possible_ball = max(contours, key=cv2.contourArea)
+
+    # If it's too small just ignore it
+    if cv2.contourArea(possible_ball) < 20:
+        return None
+    
+    # Enclose in a circle and treat this as the ball, giving us the radius, and the x and y of its centre
+    (cx, cy), r = cv2.minEnclosingCircle(possible_ball)
+    return cx, cy, 2*r
+    
+def get_target(ball_pos):
+    # Default return value if we need it: just keep turning right and hope we find something
+    if not ball_pos:
+        return 1.0, 1.0
+
+    cx, cy, d = ball_pos
+
+    # we know the ball's actual radius, so using scaling, we can figure out how far away it is
+    CAMERA_Y_FOV = np.radians(38)
+    CAMERA_H = 480
+    FOCAL_LEN = (CAMERA_H / 2) / np.tan(CAMERA_Y_FOV / 2)
+    BALL_DIAMETER = 0.05 # in metres
+
+    ball_dist = FOCAL_LEN * BALL_DIAMETER / d
+
+    # Figure out how far to turn based on the ball's x position
+    turn_dir = (cx - 320) / 320
+
+    # Get forward/backwards motion based on how far away we are
+    fwd_dir = 0.0
+    if ball_dist >= BALL_OPTIM_DIST:
+        fwd_dir = 1.0
+    else:
+        fwd_dir = -1.0
+
+    return turn_dir, fwd_dir
+
+# A simple overlay to put over what the robot sees so we can understand if it finds a ball better
+# This is only for visual output; nothing will train using this
+def overlay(frame, res):
+    # Copy the image so we can write on it and reverse colour channels 
+    img = np.ascontiguousarray(frame[:, :, ::-1])
+    h, w = img.shape[:2]
+
+    # If we didn't find the ball say so in frame
+    if res is None:
+        cv2.putText(img, "no ball", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        return img
+
+    # Use the result (from find_ball) to display a bounding circle, a crosshair at the centre, 
+    # and a line halfway through the screen to tell if we are correcting properly
+    cx, cy, diam = res
+    p = (int(cx), int(cy))
+
+    cv2.circle(img, p, int(diam / 2), (0, 255, 0), 2)
+    cv2.drawMarker(img, p, (0, 255, 0), cv2.MARKER_CROSS, 12, 2) 
+    cv2.line(img, (w // 2, 0), (w // 2, h), (255, 255, 255), 1)  
+
+    label = f"x={cx - w/2:+.0f} y={h/2 - cy:+.0f} d={diam:.0f}px"
+    cv2.putText(img, label, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+    # Modified image with overlay
+    return img
+
+# How we will move the ball around the scene 
+# def move_ball():
+
+
+# At the start don't move until we know what's going on
+target = np.zeros(2)
 
 # Mujoco viewer loop
-RATE = 1.0
 with mujoco.viewer.launch_passive(m, d) as v:
     while v.is_running():
         t0 = time.time()
-        target = np.array(read_stick())
-        stick += np.clip(target - stick, -RATE*m.opt.timestep, RATE*m.opt.timestep)  # smoothing
-        d.ctrl[:] = trot(d.time, stick[0], stick[1])
+        d.ctrl[:] = trot(d.time, target[0], target[1])
         mujoco.mj_step(m, d)
 
         # These two if statements basically just output the current camera view to opencv
@@ -91,13 +169,16 @@ with mujoco.viewer.launch_passive(m, d) as v:
         if step % ONBOARD_EVERY == 0:
             onboard_r.update_scene(d, camera="onboard")
             onboard = onboard_r.render()             
-            cv2.imshow("onboard", onboard[:, :, ::-1])
-            cv2.waitKey(1)   
+            # We can calculate the target based off this image
+            ball_pos = find_ball(onboard)
+            target = get_target(ball_pos)
+            cv2.imshow("onboard", overlay(onboard, ball_pos))
+            cv2.waitKey(1)
 
         if step % FAR_EVERY == 0:
             far_r.update_scene(d, camera="far")
             cv2.imshow("far", far_r.render()[:, :, ::-1])
-            cv2.waitKey(1)   
+            cv2.waitKey(1)
 
         # Update frame visually every 25 steps to compute faster 
         step += 1

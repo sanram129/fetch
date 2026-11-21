@@ -67,7 +67,7 @@
             <geom name="Chassis_Back_1_geom" type="mesh" mesh="Chassis_Back_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
             <inertial mass="0.09118957271614525" pos="-0.08442566290956513 0.0012599760412452148 -0.005557445401256542" fullinertia="0.00020151798162566307 0.0001311327133004917 0.00031580978013950997 -1.8269649884527832e-06 5.0880590623866845e-06 1.6457336590403848e-06" />
             <joint name="root" type="free" damping="0" armature="0"/> <!-- we need to make sure the thing can actually move -->
-            <camera name="onboard" pos="-0.27 0 0.04" xyaxes="0 1 0 0 0 1" fovy="38"/>
+            <camera name="onboard" pos="-0.27 0 0.04" xyaxes="0 1 0 -0.259 0 0.966" fovy="38"/>
             <camera name="far" mode="trackcom" pos="1.2 -1.2 0.6" xyaxes="1 1 0 -0.5 0.5 2" fovy="45"/>
             <body name="mg996R_v2-v2-3_1" pos="-0.05203371964475759 0.07461945068551114 0.004585731040754797" euler="1.5707963267948941 -2.1663226767998408e-14 1.5707963267948968">
                 <geom name="mg996R_v2-v2-3_1_geom" type="mesh" mesh="mg996R_v2-v2-3_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />

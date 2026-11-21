@@ -29,7 +29,7 @@
     <geom name="whiteboard" type="box" pos="-1.99 0 0.9" size="0.01 0.8 0.35" rgba="1 1 1 1" contype="0" conaffinity="0"/>
 
     <!-- rug: thin and grippy -->
-    <geom name="rug" type="box" pos="-0.6 0 0.004" size="0.7 0.5 0.001" rgba=".55 .25 .15 1"
+    <geom name="rug" type="box" pos="-0.6 0 0.004" size="0.7 0.5 0.00002" rgba=".55 .45 .15 1"
           contype="1" conaffinity="1" friction="1.5 0.005 0.0001"/>
 
     <!-- low obstacle to step around -->
