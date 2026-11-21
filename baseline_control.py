@@ -39,6 +39,24 @@ LEFT = {"A", "D"}
 # Get mujoco's representation of the actuators
 act = {m.joint(m.actuator_trnid[i, 0]).name: i for i in range(m.nu)}
 
+# ID of the ball from scene
+ball_id = m.body("ball").mocapid[0]
+
+# Initialize rng
+rng = np.random.default_rng()
+
+# Set default height for the ball to be fair to the robot
+BALL_Z = 0.12
+
+# Range of positions the ball will be allowed to wander between
+LO = np.array([-1.7, -1.1])
+HI = np.array([-0.4,  1.1])
+
+# Set an initial position and velocity for the ball, as well as what it would do next
+d.mocap_pos[ball_id] = [-0.9, 0.0, BALL_Z]
+ball = {"pos": np.array([-0.9, 0.0]), "vel": np.zeros(2),
+        "goal": rng.uniform(LO, HI), "next": 0.0}
+
 # The algorithm the baseline will use to walk
 # OpenCV will give it a direction and this computes it
 def trot(t, x, y, freq=2.0, hip_amp=0.35, knee_amp=0.45):
@@ -151,8 +169,28 @@ def overlay(frame, res):
     return img
 
 # How we will move the ball around the scene 
-# def move_ball():
+def move_ball(dt, speed=0.2):
 
+    # If the ball is very close to the goal or it has been long enough,
+    # update the position of the ball
+    to_goal = ball["goal"] - ball["pos"]
+    if d.time > ball["next"] or np.linalg.norm(to_goal) < 0.05:
+        ball["goal"] = rng.uniform(LO, HI)
+
+        # Move it after somewhere between 2 and 5 seconds
+        ball["next"] = d.time + rng.uniform(2.0, 5.0)
+        to_goal = ball["goal"] - ball["pos"]
+
+    # Get the target direction vector to head towards the ball without dividing by 0 accidentally
+    want = speed * to_goal / (np.linalg.norm(to_goal) + 1e-9)
+
+    # Update velocity and position of the ball
+    ball["vel"] += (want - ball["vel"]) * min(1.0, dt / 0.5)
+    ball["pos"] += ball["vel"] * dt
+
+    # Add some jitter horizontally and update position of the ball
+    xy = ball["pos"] + rng.normal(0, 0.002, 2)
+    d.mocap_pos[ball_id] = [xy[0], xy[1], BALL_Z]
 
 # At the start don't move until we know what's going on
 target = np.zeros(2)
@@ -162,6 +200,7 @@ with mujoco.viewer.launch_passive(m, d) as v:
     while v.is_running():
         t0 = time.time()
         d.ctrl[:] = trot(d.time, target[0], target[1])
+        move_ball(m.opt.timestep)
         mujoco.mj_step(m, d)
 
         # These two if statements basically just output the current camera view to opencv
