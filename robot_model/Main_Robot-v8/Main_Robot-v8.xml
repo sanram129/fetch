@@ -60,10 +60,16 @@
         <mesh name="linkage-2_1" file="meshes/linkage-2_1.stl" scale="0.001 0.001 0.001" />
     </asset>
     <worldbody>
+        <!-- environment stuff -->
         <light directional="true" pos="-0.5 0.5 3" dir="0 0 -1" />
-        <body name="Chassis_Back_1" pos="0.1448285379184934 2.842170943040401e-16 -1.088573675644966e-15" euler="0.0 -0.0 0.0">
+        <!-- robot -->
+        <body name="Chassis_Back_1" pos="0.1448285379184934 2.842170943040401e-16 0.3" euler="0.0 -0.0 0.0">
+            <site name="imu" pos="-0.145 0 0.02" xyaxes="-1 0 0 0 -1 0"/>
             <geom name="Chassis_Back_1_geom" type="mesh" mesh="Chassis_Back_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
             <inertial mass="0.09118957271614525" pos="-0.08442566290956513 0.0012599760412452148 -0.005557445401256542" fullinertia="0.00020151798162566307 0.0001311327133004917 0.00031580978013950997 -1.8269649884527832e-06 5.0880590623866845e-06 1.6457336590403848e-06" />
+            <joint name="root" type="free" damping="0" armature="0"/> <!-- we need to make sure the thing can actually move -->
+            <camera name="onboard" pos="-0.27 0 0.04" xyaxes="0 1 0 -0.259 0 0.966" fovy="38"/>
+            <camera name="far" mode="trackcom" pos="1.2 -1.2 0.6" xyaxes="1 1 0 -0.5 0.5 2" fovy="45"/>
             <body name="mg996R_v2-v2-3_1" pos="-0.05203371964475759 0.07461945068551114 0.004585731040754797" euler="1.5707963267948941 -2.1663226767998408e-14 1.5707963267948968">
                 <geom name="mg996R_v2-v2-3_1_geom" type="mesh" mesh="mg996R_v2-v2-3_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
                 <inertial mass="0.058954824643923764" pos="-0.009400267371183295 4.527922472834546e-09 -0.008301646730100611" fullinertia="9.50860834029952e-06 1.596504240330476e-05 1.0225028091403523e-05 2.26640127864047e-11 -3.574414000125526e-07 -4.570202439359196e-12" />
@@ -104,7 +110,7 @@
                                     </body>
                                     <body name="lower_leg-3_1" pos="0.0 0.0 -1.7763568394002505e-17" euler="-4.930380657631324e-32 2.969814369162972e-33 0.0">
                                         <joint name="Revolute-48" type="hinge" axis="-5.551115123125783e-17 4.279953563623021e-16 1.0000000000000013" pos="0.05656865952991258 -0.05656824518532118 -0.004999743584570792" />
-                                        <geom name="lower_leg-3_1_geom" type="mesh" mesh="lower_leg-3_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+                                        <geom name="lower_leg-3_1_geom" type="mesh" mesh="lower_leg-3_1" pos="0 0 0" euler="0 0 0" contype="2" conaffinity="1" group="2" />
                                         <inertial mass="0.0046271514504864055" pos="0.030199107103650535 -0.08293701202070412 -0.002500162443890715" fullinertia="2.460007761344261e-06 2.4601683038563457e-06 4.848655529313603e-06 -2.3626894548597655e-06 -2.41715354728396e-11 -2.4917359420977188e-11" />
                                     </body>
                                 </body>
@@ -153,7 +159,7 @@
                                     </body>
                                     <body name="lower_leg-1_1" pos="-5.551115123125783e-19 0.0 0.0" euler="2.4354234303204383e-32 -0.0 -4.930380657631324e-32">
                                         <joint name="Revolute-45" type="hinge" axis="-2.1994849167236168e-16 1.387778780781451e-16 1.0000000000000018" pos="0.05656821689618653 -0.056568659529912746 -0.011599743584571878" />
-                                        <geom name="lower_leg-1_1_geom" type="mesh" mesh="lower_leg-1_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+                                        <geom name="lower_leg-1_1_geom" type="mesh" mesh="lower_leg-1_1" pos="0 0 0" euler="0 0 0" contype="2" conaffinity="1" group="2" />
                                         <inertial mass="0.004653335058505044" pos="0.08283106280100878 -0.030307023072108186 -0.002499947986028554" fullinertia="2.4876186959517993e-06 2.4877667636888656e-06 4.903667141620668e-06 -2.3898551239808855e-06 7.795197816690815e-12 7.927870056889177e-12" />
                                     </body>
                                 </body>
@@ -229,7 +235,7 @@
                                         </body>
                                         <body name="lower_leg_1" pos="0.0 0.0 0.0" euler="-5.356492657826945e-34 -2.465190328815662e-32 0.0">
                                             <joint name="Revolute-33" type="hinge" axis="-2.1684043449710094e-16 -2.7755575615628673e-17 1.0000000000000013" pos="0.056568488113036046 -0.05656891964475776 -0.01859994358457218" />
-                                            <geom name="lower_leg_1_geom" type="mesh" mesh="lower_leg_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+                                            <geom name="lower_leg_1_geom" type="mesh" mesh="lower_leg_1" pos="0 0 0" euler="0 0 0" contype="2" conaffinity="1" group="2" />
                                             <inertial mass="0.004653335058505044" pos="0.08283106280100887 -0.030307023072108183 -0.0024999479860285576" fullinertia="2.4876186959518163e-06 2.4877667636888232e-06 4.9036671416206374e-06 -2.3898551239808863e-06 7.795197816316695e-12 7.927870063254818e-12" />
                                         </body>
                                     </body>
@@ -278,7 +284,7 @@
                                         </body>
                                         <body name="lower_leg-2_1" pos="0.0 0.0 0.0" euler="0.0 -0.0 0.0">
                                             <joint name="Revolute-51" type="hinge" axis="5.551115123125782e-17 3.9995201891127537e-16 1.0000000000000007" pos="0.05656891964475783 -0.05656897396847148 -0.004999943584571667" />
-                                            <geom name="lower_leg-2_1_geom" type="mesh" mesh="lower_leg-2_1" pos="0 0 0" euler="0 0 0" contype="0" conaffinity="0" group="2" />
+                                            <geom name="lower_leg-2_1_geom" type="mesh" mesh="lower_leg-2_1" pos="0 0 0" euler="0 0 0" contype="2" conaffinity="1" group="2" />
                                             <inertial mass="0.0046271514504864055" pos="0.030199107103650494 -0.08293701202070405 -0.0025001624438906966" fullinertia="2.4600077613442874e-06 2.4601683038563296e-06 4.848655529313582e-06 -2.362689454859744e-06 -2.417153545868596e-11 -2.4917359427943738e-11" />
                                         </body>
                                     </body>
@@ -290,6 +296,12 @@
             </body>
         </body>
     </worldbody>
+    <!-- The simulated IMU -->
+    <sensor>
+        <accelerometer name="imu_acc"  site="imu"/>
+        <gyro          name="imu_gyro" site="imu"/>
+        <framequat     name="imu_quat" objtype="site" objname="imu"/>
+    </sensor>
     <equality>
         <!-- front-left-ish leg (upper_leg_1) -->
         <connect body1="linkage_1"   body2="lower_leg_1"   anchor="0.035356 -0.077781 0" solref="0.005 1"/>
