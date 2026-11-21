@@ -279,35 +279,36 @@ def move_ball(dt, speed=0.2):
     xy = ball["pos"] + rng.normal(0, 0.002, 2)
     d.mocap_pos[ball_id] = [xy[0], xy[1], BALL_Z]
 
-# At the start don't move until we know what's going on
-target = np.zeros(2)
+if __name__ == '__main__':
+    # At the start don't move until we know what's going on
+    target = np.zeros(2)
 
-# Mujoco viewer loop
-with mujoco.viewer.launch_passive(m, d) as v:
-    while v.is_running():
-        t0 = time.time()
-        d.ctrl[:] = trot(d.time, target[0], target[1])
-        move_ball(m.opt.timestep)
-        mujoco.mj_step(m, d)
+    # Mujoco viewer loop
+    with mujoco.viewer.launch_passive(m, d) as v:
+        while v.is_running():
+            t0 = time.time()
+            d.ctrl[:] = trot(d.time, target[0], target[1])
+            move_ball(m.opt.timestep)
+            mujoco.mj_step(m, d)
 
-        # These two if statements basically just output the current camera view to opencv
-        # for viewing in separate camera feeds or just saving for the model
-        if step % ONBOARD_EVERY == 0:
-            onboard_r.update_scene(d, camera="onboard")
-            onboard = onboard_r.render()             
-            # We can calculate the target based off this image
-            ball_pos = find_ball(onboard)
-            target = teacher()#get_target(ball_pos)
-            cv2.imshow("onboard", overlay(onboard, ball_pos))
-            cv2.waitKey(1)
+            # These two if statements basically just output the current camera view to opencv
+            # for viewing in separate camera feeds or just saving for the model
+            if step % ONBOARD_EVERY == 0:
+                onboard_r.update_scene(d, camera="onboard")
+                onboard = onboard_r.render()             
+                # We can calculate the target based off this image
+                ball_pos = find_ball(onboard)
+                target = teacher()#get_target(ball_pos)
+                cv2.imshow("onboard", overlay(onboard, ball_pos))
+                cv2.waitKey(1)
 
-        if step % FAR_EVERY == 0:
-            far_r.update_scene(d, camera="far")
-            cv2.imshow("far", far_r.render()[:, :, ::-1])
-            cv2.waitKey(1)
+            if step % FAR_EVERY == 0:
+                far_r.update_scene(d, camera="far")
+                cv2.imshow("far", far_r.render()[:, :, ::-1])
+                cv2.waitKey(1)
 
-        # Update frame visually every 25 steps to compute faster 
-        step += 1
-        if step % 25 == 0:
-            v.sync()
-        time.sleep(max(0, m.opt.timestep - (time.time() - t0)))
+            # Update frame visually every 25 steps to compute faster 
+            step += 1
+            if step % 25 == 0:
+                v.sync()
+            time.sleep(max(0, m.opt.timestep - (time.time() - t0)))
