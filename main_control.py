@@ -10,7 +10,7 @@ import time
 import cv2
 
 # Load in the default scene, and create a data object to hold the current scene state
-m = mujoco.MjModel.from_xml_path("classroom.xml")
+m = mujoco.MjModel.from_xml_path("scene_rand.xml")
 d = mujoco.MjData(m)
 
 # Start up two cameras, one that goes on the robot (ie. what it sees)
@@ -192,6 +192,42 @@ def get_target(ball_pos):
 
     return turn_dir, fwd_dir
 
+# IDs of the main part of the chassis and camera on the robot
+CH = m.body("Chassis_Back_1").id
+CAM = m.camera("onboard").id
+
+# Get horizontal fov (around 49 degrees; made to mimic logitech c270 the real robot will use)
+HFOV = 2 * np.arctan(np.tan(np.radians(38) / 2) * 640 / 480)  
+
+# The teacher controller that always has the ball's position
+def teacher(standoff=0.30, k_turn=1.5, k_fwd=2.0, deadband=0.04):
+
+    # Rotation matrix of the ball relative to the chassis
+    # Matmul with the camera's position relative to the ball to get the ball in the camera's coordinate frame
+    R = d.xmat[CH].reshape(3, 3)
+    rel = R.T @ (d.mocap_pos[ball_id] - d.cam_xpos[CAM])
+
+    # Correct direction as -x is default forwards for the robot model
+    ahead, right = -rel[0], rel[1]
+
+    # Get a distance and angle of the ball
+    dist = np.hypot(ahead, right)
+    rel_angle = np.arctan2(right, ahead)
+
+    # Get turn direction based off angle and a tunable gain
+    turn = np.clip(k_turn * rel_angle, -1, 1)
+
+    # Correct for distance with proportional gain which helps in case the ball gets too close/far
+    err = dist - standoff
+
+    # If we are very close (within deadband) stop moving
+    err = 0.0 if abs(err) < deadband else err - np.sign(err) * deadband
+
+    # Turn if the ball slips behind instead of reversing, as the ball does not avoid the robot 
+    # (it collides with it for the time being)
+    fwd = np.clip(k_fwd * err, -1, 1) * max(0.0, np.cos(rel_angle))
+    return turn, fwd
+
 # A simple overlay to put over what the robot sees so we can understand if it finds a ball better
 # This is only for visual output; nothing will train using this
 def overlay(frame, res):
@@ -261,7 +297,7 @@ with mujoco.viewer.launch_passive(m, d) as v:
             onboard = onboard_r.render()             
             # We can calculate the target based off this image
             ball_pos = find_ball(onboard)
-            target = get_target(ball_pos)
+            target = teacher()#get_target(ball_pos)
             cv2.imshow("onboard", overlay(onboard, ball_pos))
             cv2.waitKey(1)
 
