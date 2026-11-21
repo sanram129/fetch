@@ -1,3 +1,8 @@
+''' 
+    This file sets up all the mujoco control and viewer, generates samples
+    for training, and then also defines the baseline and teacher controllers.
+'''
+
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -57,8 +62,47 @@ d.mocap_pos[ball_id] = [-0.9, 0.0, BALL_Z]
 ball = {"pos": np.array([-0.9, 0.0]), "vel": np.zeros(2),
         "goal": rng.uniform(LO, HI), "next": 0.0}
 
+# Accelerometer info
+G = 9.81
+
+# Some sensor bias gathered from the real-life MPU6050 I own
+# This noise will be simulated in the model
+gyro_bias = np.array([-3.5, 1.4, 0.1])
+
+# Also simulate the joints used by the 12-bit AS5600 encoder the robot will also use
+JOINTS = ["Revolute-16", "Revolute-17", "Revolute-22", "Revolute-23",   # lateral hip movement 
+          "Revolute-28", "Revolute-35", "Revolute-36", "Revolute-34",   # forward/backward hip movement
+          "Revolute-31", "Revolute-49", "Revolute-46", "Revolute-43"]   # knees
+qadr = [m.joint(j).qposadr[0] for j in JOINTS]
+LSB = 2*np.pi / 4096                                                  
+
+# "Read" the joints and add a bit of noise
+def read_joints(rng):
+    q = d.qpos[qadr] + rng.normal(0, 0.002, len(qadr))
+    return np.round(q / LSB) * LSB
+
+# Simulate reading the IMU so we have similar types of data to real life
+def read_imu(rng):
+    # MPU6050 reads acceleration in Gs (multiples of 9.81)
+    acc = d.sensor("imu_acc").data / G
+
+    # Real sensor: degrees/s, mujoco: radians/s
+    gyro = np.degrees(d.sensor("imu_gyro").data)
+
+    # Simulated jitter found experimentally, roughly 0.01g and 0.15 deg 
+    # for accelerometer and gyro, respectively
+    acc = acc + rng.normal(0, 0.01, 3)
+    gyro = gyro + gyro_bias_dps + rng.normal(0, 0.15, 3)
+
+    # From the MPU datasheet, convert this to the bit representations (in LSBs)
+    # that the MPU6050 actually uses
+    acc = np.clip(np.round(acc  * 16384) / 16384, -2, 2)
+    gyro = np.clip(np.round(gyro * 131) / 131, -250, 250)
+
+    return acc, gyro
+
 # The algorithm the baseline will use to walk
-# OpenCV will give it a direction and this computes it
+# The models will give it a direction and this computes joint positions
 def trot(t, x, y, freq=2.0, hip_amp=0.35, knee_amp=0.45):
     """x: -1 (left) .. +1 (right), y: -1 (back) .. +1 (forward)."""
     # clamp so we stay at a max speed of 1 on diagonals
@@ -87,6 +131,13 @@ def trot(t, x, y, freq=2.0, hip_amp=0.35, knee_amp=0.45):
         ctrl[act[hip]] = hip_dir * hip_amp * scale * np.sin(phase)
         ctrl[act[knee]] = knee_dir * knee_amp * lift * swing
     return ctrl
+
+'''
+    The following two functions, find_ball and get_target, make up
+    the baseline controller. trot() will be used by both. The inputs
+    to both the primary model and baseline are the current frame,
+    and the outputs are the forward and lateral movement velocities.
+'''
 
 # Given the frame, give a cardinal direction for where we need to go
 # Forward if we need to get closer or are tracking well, backwards
