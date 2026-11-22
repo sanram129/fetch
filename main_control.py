@@ -223,7 +223,7 @@ def overlay(frame, res):
 
 # How we will move the ball around the scene 
 # If random is set to false we must provide a set of coordinates and timestamps to play back
-def move_ball(ball, ball_id, dt, d, speed=0.2, random=True, playback_coords=None):
+def move_ball(ball, ball_id, dt, d, speed=0.2, random=True, keyframes=None):
 
     if random:
         # If the ball is very close to the goal or it has been long enough,
@@ -247,13 +247,20 @@ def move_ball(ball, ball_id, dt, d, speed=0.2, random=True, playback_coords=None
         xy = ball["pos"] + rng.normal(0, 0.002, 2)
         d.mocap_pos[ball_id] = [xy[0], xy[1], BALL_Z]
     else:
-        if not playback_coords:
+        if keyframes is None:
             raise ValueError("playback_coords cannot be 'None' if random set to False")
+
+        # Stop and hold if we finish the sequence
+        t = min(keyframes["t"][-1], d.time)        
+
+        # Interpolate based on current time and keyframes
+        d.mocap_pos[ball_id] = [np.interp(t, keyframes["t"], keyframes["ball"][:, i]) for i in range(3)]
 
 # What the recorder calls to create a datapoint
 # Will return the ball positions in an array, along with the path in which camera frames are stored,
 # and IMU and joint data in arrays too
-def scene_update_loop(scene, recording_time=30):
+# If it is run with playback enabled, it will simply play back a scene we give it
+def scene_update_loop(scene, recording_time=30, playback=False, old_log=None):
     # Things we need to update with a new scene
     # Load in the default scene, and create a data object to hold the current scene state
     m = mujoco.MjModel.from_xml_path(scene)
@@ -294,14 +301,14 @@ def scene_update_loop(scene, recording_time=30):
     num_frames = 0
 
     # The logs of data which we return/save afterwards
-    log = []
+    log = old_log if playback else []
 
     # Mujoco viewer loop
     with mujoco.viewer.launch_passive(m, d) as v:
         while v.is_running():
             t0 = time.time()
             d.ctrl[:] = trot(d.time, target[0], target[1], act, m)
-            move_ball(ball, ball_id, m.opt.timestep, d)
+            move_ball(ball, ball_id, m.opt.timestep, d, random=(not playback), keyframes=old_log)
             mujoco.mj_step(m, d)
 
             # These two if statements basically just output the current camera view to opencv
@@ -315,14 +322,15 @@ def scene_update_loop(scene, recording_time=30):
 
                 # Update the logs every camera frame to sync them up
                 acc, gyro = read_imu(d, rng)
-                log.append(dict(
-                    t=d.time,
-                    img=cv2.resize(onboard, (128, 96)),
-                    acc=acc, gyro=gyro,
-                    q=read_joints(m, d, rng),
-                    label=target,
-                    ball=d.mocap_pos[ball_id].copy(), 
-                ))
+                if not playback:
+                    log.append(dict(
+                        t=d.time,
+                        img=cv2.resize(onboard, (128, 96)),
+                        acc=acc, gyro=gyro,
+                        q=read_joints(m, d, rng),
+                        label=target,
+                        ball=d.mocap_pos[ball_id].copy(), 
+                    ))
 
                 num_frames += 1 
 
@@ -343,7 +351,7 @@ def scene_update_loop(scene, recording_time=30):
             if num_frames == recording_time * 10:
                 break
 
-    return log
+    return log if not playback else []
 
 if __name__ == '__main__':
-    scene_update_loop("scenes/classroom.xml")
+    scene_update_loop("scenes/rand_scene_0.xml", recording_time=5, playback=True, old_log=np.load("data/run_scene_0_take_0.npz"))
