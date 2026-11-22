@@ -268,7 +268,24 @@ def load_primary_model(model_file):
     model.load_state_dict(ckpt["model"])
     model.eval()
 
-    mean, std_dev = ckpt["mean"].to(device), ckpt["std_dev"].to(device)
+    mean, std_dev = ckpt["mu"].to(device), ckpt["sd"].to(device)
+
+    return model, mean, std_dev
+
+def policy_step(model, onboard, acc, gyro, joints, mu, sd):
+    # 1. Image: do the same two-stage resize as in training (frames were saved at 128x96, then squashed)
+    img = cv2.resize(onboard, (128, 96), interpolation=cv2.INTER_AREA)       # (96, 128, 3) uint8, still RGB
+    x = torch.from_numpy(img).to(device).permute(2, 0, 1).float() / 255      # (3, 96, 128)
+    x = F.interpolate(x[None], size=(96, 96), mode="bilinear",
+                      align_corners=False, antialias=True)                   # (1, 3, 96, 96)
+    x = x[:, None]                                                           # (1, 1, 3, 96, 96): batch, time
+
+    # 2. Sensors: same order and normalisation as in training (acc, gyro, joints)
+    s = torch.tensor([*acc, *gyro, *joints], dtype=torch.float32, device=device)
+    s = ((s - mu) / sd)[None, None]                                          # (1, 1, 18)
+
+    with torch.no_grad():
+        return model(x, s)[0, 0].cpu().numpy() 
 
 # What the recorder calls to create a datapoint
 # Will return the ball positions in an array, along with the path in which camera frames are stored,
@@ -282,7 +299,7 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
     d = mujoco.MjData(m)
 
     # Load the primary model
-    model = load_primary_model("fetch_nn_10_epochs_0001_lr.pt") if controller == "primary" else None
+    model, mu, sd = load_primary_model("fetch_nn_10_epochs_0001_lr.pt") if controller == "primary" else None
 
     # Start up two cameras, one that goes on the robot (ie. what it sees)
     # and a second to view from afar for debug
@@ -347,8 +364,7 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
                     # Actual model
                     case "primary":
                         with torch.no_grad():
-                            target = model(F.interpolate(onboard, size=(96, 96), mode="bilinear", align_corners=False, antialias=True), 
-                                           [*acc, *gyro, *read_joints(m, d, rng)])
+                            target = policy_step(model, onboard, acc, gyro, read_joints(m, d, rng), mu, sd)
 
                 # Update the logs every camera frame to sync them up
                 if not playback:
@@ -393,4 +409,4 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
     return log
 
 if __name__ == '__main__':
-    scene_update_loop("scenes/rand_scene_0.xml", recording_time=30, playback=True, old_log=np.load("data/run_scene_0_take_1.npz"), controller="primary")
+    scene_update_loop("scenes/rand_scene_0.xml", recording_time=30, playback=True, old_log=np.load("data/run_scene_0_take_3.npz"), controller="primary")
