@@ -260,7 +260,8 @@ def move_ball(ball, ball_id, dt, d, speed=0.2, random=True, keyframes=None):
 # Will return the ball positions in an array, along with the path in which camera frames are stored,
 # and IMU and joint data in arrays too
 # If it is run with playback enabled, it will simply play back a scene we give it
-def scene_update_loop(scene, recording_time=30, playback=False, old_log=None):
+# It can additionally specify whether or not to use the teacher or baseline or primary model
+def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, controller="teacher"):
     # Things we need to update with a new scene
     # Load in the default scene, and create a data object to hold the current scene state
     m = mujoco.MjModel.from_xml_path(scene)
@@ -318,7 +319,15 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None):
                 onboard = onboard_r.render()             
                 # We can calculate the target based off this image
                 ball_pos = find_ball(onboard)
-                target = teacher(d, ball_id, ch, cam)#get_target(ball_pos)
+
+                match controller:
+                    case "teacher":                  
+                        target = teacher(d, ball_id, ch, cam)
+                    case "baseline":
+                        target = get_target(ball_pos)
+                    # Actual model
+                    case "primary":
+                        pass
 
                 # Update the logs every camera frame to sync them up
                 acc, gyro = read_imu(d, rng)
@@ -354,4 +363,4 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None):
     return log if not playback else []
 
 if __name__ == '__main__':
-    scene_update_loop("scenes/rand_scene_0.xml", recording_time=5, playback=True, old_log=np.load("data/run_scene_0_take_0.npz"))
+    scene_update_loop("scenes/test_rand_0.xml", recording_time=5, playback=True, old_log=np.load("data/run_scene_0_take_1.npz"), controller="baseline")

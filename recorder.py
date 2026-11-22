@@ -13,8 +13,11 @@ from time import time
 from pathlib import Path
 
 # How many scenes to create, as well as how many times to run a path in the same scene
-NUM_SCENES = 1
-TIMES_PER_SCENE = 2
+NUM_SCENES = 25
+TIMES_PER_SCENE = 4
+
+# Time in seconds to run a recording sample
+REC_TIME = 30
 
 SCENE_DIR = "scenes"
 DATA_DIR = "data"
@@ -40,7 +43,8 @@ if __name__ == '__main__':
 
         for j in range(TIMES_PER_SCENE):
             # Record the scene
-            captured_data = main_control.scene_update_loop(scene=str(new_scene_path), recording_time=5)
+            captured_data = main_control.scene_update_loop(scene=str(new_scene_path), 
+                                recording_time=REC_TIME, playback=False, old_log=None, controller="teacher")
 
             # Save the scene as a numpy file
             np.savez_compressed(str(Path(DATA_DIR) / f"run_scene_{i}_take_{j}.npz"),
@@ -48,8 +52,3 @@ if __name__ == '__main__':
                 acc=np.stack([r["acc"] for r in captured_data]), gyro=np.stack([r["gyro"] for r in captured_data]),
                 q=np.stack([r["q"] for r in captured_data]), label=np.array([r["label"] for r in captured_data]),
                 ball=np.stack([r["ball"] for r in captured_data]))
-
-
-
-
-
