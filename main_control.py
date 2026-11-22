@@ -339,6 +339,7 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
                         q=read_joints(m, d, rng),
                         label=target,
                         ball=d.mocap_pos[ball_id].copy(), 
+                        cam=d.cam_xpos[cam].copy()
                     ))
 
                 num_frames += 1 
