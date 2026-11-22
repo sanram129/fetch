@@ -51,4 +51,4 @@ if __name__ == '__main__':
                 t=[r["t"] for r in captured_data], img=np.stack([r["img"] for r in captured_data]),
                 acc=np.stack([r["acc"] for r in captured_data]), gyro=np.stack([r["gyro"] for r in captured_data]),
                 q=np.stack([r["q"] for r in captured_data]), label=np.array([r["label"] for r in captured_data]),
-                ball=np.stack([r["ball"] for r in captured_data]))
+                ball=np.stack([r["ball"] for r in captured_data]), cam=np.stack([r["cam"] for r in captured_data]))
