@@ -5,6 +5,7 @@
 
 import main_control
 import numpy as np
+from pathlib import Path
 
 NUM_SCENES = 25
 TIMES_PER_SCENE = 4
@@ -28,7 +29,7 @@ if __name__ == '__main__':
     for i in range(NUM_SCENES):
         for j in range(TIMES_PER_SCENE):
             # Load in save file
-            data = np.load(f"run_scene_{i}_take_{j}.npz")
+            data = np.load(str(Path(DATA_DIR) / f"run_scene_{i}_take_{j}.npz"))
 
             # Get distances on each frame
             dist = np.linalg.norm(data["ball"] - data["cam"], axis=1)
