@@ -10,10 +10,10 @@ from pathlib import Path
 NUM_SCENES = 25
 TIMES_PER_SCENE = 4
 
-DATA_DIR = "data"
+DATA_DIR = "baseline"
 STATS_DIR = "stats"
 
-STATS_FILE_NAME = "teacher_stats"
+STATS_FILE_NAME = "baseline_stats"
 
 if __name__ == '__main__':
     # Make a stats dir if it doesn't exist

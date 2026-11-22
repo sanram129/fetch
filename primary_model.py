@@ -9,7 +9,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 import numpy as np
 import glob
 from torch.utils.data import TensorDataset, DataLoader
@@ -27,7 +26,7 @@ class FetchNN(torch.nn.Module):
 
         # Convolutional portion: Go from 3 to 64 channels, from a 96x96 image down to 
         # 8x8 to capture as many features as possible
-        self.conv1 == nn.Conv2d(3, 8, kernel_size=3) # 96x96 --> 94x94
+        self.conv1 = nn.Conv2d(3, 8, kernel_size=3) # 96x96 --> 94x94
         self.pool = nn.MaxPool2d(2, 2) # 94x94 --> 47x47
         self.conv2 = nn.Conv2d(8, 16, kernel_size=3) # 47x47 --> 45x45 --> 22x22
         self.conv3 = nn.Conv2d(16, 32, kernel_size = 3) # 22x22 --> 20x20 --> 10x10
@@ -44,26 +43,29 @@ class FetchNN(torch.nn.Module):
         self.final_fc1 = nn.Linear(64, 16)
         self.final_fc2 = nn.Linear(16, 2)
 
-    def forward(self, camera_img, sensor_data, prev_output):
+    def forward(self, camera_img, sensor_data):
+        B, T = camera_img.shape[:2]
+
+        x = camera_img.flatten(0, 1)
+
         # Convolutional forward pass
-        x = self.pool(F.relu(self.conv1(camera_img)))
+        x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = self.pool(F.relu(self.conv3(x)))
-        x = self.pool(F.relu(self.conv4(x)))
+        x = F.relu(self.conv4(x))
 
         # Flatten but keep batch size and pass through first fc
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.conv_fc(x))
+        x = F.relu(self.conv_fc(x.flatten(1)))
+        x = x.unflatten(0, (B, T))
 
         # Concatenate inputs and give to RNN
-        x = torch.cat((camera_img, sensor_data, prev_output), dim=0)
+        x = torch.cat((x, sensor_data), dim=-1)
 
         # Set starting hidden state to be zeroed out and pass to rnn
-        h0 = torch.zeros(1, x.size(0), self.rnn_hidden_size)
-        out, _ = self.rnn1(x, h0)
+        out, _ = self.rnn1(x)
 
         # Final ANN gets last RNN output
-        x = F.relu(self.final_fc1(out[:, -1, :]))
+        x = F.relu(self.final_fc1(out))
         return self.final_fc2(x)
 
 # Get DataLoader objects for test, train, and val data from the saved .npz files
@@ -85,9 +87,9 @@ def process_dataset():
     val_begin = round(len(indices)*0.7)
     test_begin = round(len(indices)*0.85)
 
-    train_data = runs[indices[:val_begin]]
-    val_data = runs[indices[val_begin:test_begin]]
-    test_data = runs[indices[test_begin:]]
+    train_data = [runs[i] for i in indices[:val_begin]]
+    val_data = [runs[i] for i in indices[val_begin:test_begin]]
+    test_data = [runs[i] for i in indices[test_begin:]]
 
     train_data_cat = torch.cat([p for _, p, _ in train_data])
     mean, std_dev = train_data_cat.mean(0), train_data_cat.std(0) + 1e-6
@@ -211,3 +213,10 @@ if __name__ == '__main__':
     # Actually train the model, then plot the data after all epochs
     fetch_model, stats = train(fetch_model, train_dl, val_dl, num_epochs=10, learning_rate=0.001)
     plot_hist(stats)
+
+    # Save the model
+    torch.save({
+        "model": fetch_model.state_dict(),
+        "mu": mean, "sd": std_dev,                       
+        "rnn_hidden_size": 64,
+    }, "fetch_nn_10_epochs_0001_lr.pt")
