@@ -22,9 +22,10 @@ REC_TIME = 30
 SCENE_DIR = "scenes"
 DATA_DIR = "data"
 BASELINE_DATA_DIR = "baseline"
+MODEL_DATA_DIR = "models"
 
 # Either teacher, baseline, or primary
-RUN_TYPE = "baseline"
+RUN_TYPE = "primary"
 
 # Give it a scene.xml file, along with a main folder to save the data, and
 # it will save time-series camera data, and return joint, and IMU data over a run using the
@@ -70,9 +71,27 @@ def record_scenes_baseline():
                 t=[r["t"] for r in captured_data], label=np.array([r["label"] for r in captured_data]),
                 ball=np.stack([r["ball"] for r in captured_data]), cam=np.stack([r["cam"] for r in captured_data]))
 
+# Use the actual model to record scenes
+def record_scenes_primary():
+    if not Path.is_dir(MODEL_DATA_DIR):
+        Path(MODEL_DATA_DIR).mkdir()
+
+    for i in range(16, NUM_SCENES):
+        for j in range(TIMES_PER_SCENE):
+            data = np.load(str(Path(DATA_DIR) / f"run_scene_{i}_take_{j}.npz"))
+
+            captured_data = main_control.scene_update_loop(scene=str(Path(SCENE_DIR) / f'rand_scene_{i}.xml'), recording_time=REC_TIME,
+                                                            playback=True, old_log=data, controller="primary")
+
+            np.savez_compressed(str(Path(MODEL_DATA_DIR) / f"run_scene_{i}_take_{j}.npz"),
+                t=[r["t"] for r in captured_data], label=np.array([r["label"] for r in captured_data]),
+                ball=np.stack([r["ball"] for r in captured_data]), cam=np.stack([r["cam"] for r in captured_data]))
+
 if __name__ == '__main__':
     match RUN_TYPE:
         case "teacher":
             record_scenes_teacher()
         case "baseline":
             record_scenes_baseline()    
+        case "primary":
+            record_scenes_primary()

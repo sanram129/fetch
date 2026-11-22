@@ -409,4 +409,4 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
     return log
 
 if __name__ == '__main__':
-    scene_update_loop("scenes/rand_scene_0.xml", recording_time=30, playback=True, old_log=np.load("data/run_scene_0_take_3.npz"), controller="primary")
+    scene_update_loop("scenes/rand_scene_2.xml", recording_time=30, playback=True, old_log=np.load("data/run_scene_0_take_3.npz"), controller="primary")

@@ -123,15 +123,15 @@ def preprocess_image(img):
 # Get the absolute error between the predicted values and absolute values of the direction
 def pred_mean_abs_err(pred, gt):
     # 2-dimensional, first is the error of the turn, second is of the forward strength
-    return (pred - gt).abs().mean(0)
+    return np.abs((pred - gt)).mean(0)
 
 # Also get accuracy in terms of whether or not we are facing the right way
 def right_way_accuracy(pred, gt):
-    # Ignore when we didn't really need to turn or change directions
-    mask = gt[:, 0].abs() > 0.1
-
-    # Basically gives us 1 if we guess both right, 0.5 if we got one right, and 0 if we missed both
-    return (pred[mask, 0].sign() == gt[mask, 0].sign()).float().mean()
+    pred, gt = np.asarray(pred), np.asarray(gt)
+    mask = np.abs(gt[:, 0]) > 0.1                 # ignore frames where the target is ~straight
+    if not mask.any():
+        return float("nan")                       # nothing to score
+    return (np.sign(pred[mask, 0]) == np.sign(gt[mask, 0])).mean()
 
 def train(model, train_data, val_data, num_epochs=20, learning_rate=0.001):
     torch.manual_seed(67)
