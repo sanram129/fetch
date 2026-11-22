@@ -1,0 +1,39 @@
+<mujoco model="scene_rand">
+    <compiler meshdir=".." />
+  <include file="../robot_model/Main_Robot-v8/Main_Robot-v8.xml"/>
+  <visual>
+    <headlight ambient="0.18 0.18 0.18" diffuse="0.51 0.51 0.51" specular="0 0 0"/>
+    <global azimuth="130" elevation="-25"/>
+    <map znear="0.005"/>
+  </visual>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.642 0.590 0.465" rgb2="0.385 0.397 0.301" width="512" height="3072"/>
+    
+    <material name="floor" rgba="0.725 0.871 0.564 1"/>
+  </asset>
+  <worldbody>
+    <light pos="-1.23 -0.93 2.84" dir="-0.08 -0.12 -1" diffuse="0.50 0.55 0.52" castshadow="true"/>
+    <geom name="floor" type="plane" size="2.0 1.5 0.05" material="floor" contype="1" conaffinity="1" friction="1.09 0.005 0.0001"/>
+    <geom name="wall_a" type="box" pos="-2.05 0 0.75" size="0.05 1.6 0.75" rgba="0.459 0.840 0.299 1" contype="1" conaffinity="1"/>
+    <geom name="wall_b" type="box" pos="2.05 0 0.75" size="0.05 1.6 0.75" rgba="0.409 0.493 0.235 1" contype="1" conaffinity="1"/>
+    <geom name="wall_c" type="box" pos="0 -1.55 0.75" size="2.1 0.05 0.75" rgba="0.374 0.848 0.346 1" contype="1" conaffinity="1"/>
+    <geom name="wall_d" type="box" pos="0 1.55 0.75" size="2.1 0.05 0.75" rgba="0.663 0.127 0.151 1" contype="1" conaffinity="1"/>
+    <geom type="box" pos="0.78 0.99 0.0020" size="0.28 0.25 0.002" rgba="0.537 0.468 0.065 1" contype="1" conaffinity="1" friction="0.51 0.005 0.0001"/>
+    <geom type="box" pos="0.44 -1.17 0.0024" size="0.36 0.35 0.002" rgba="0.740 0.575 0.421 1" contype="1" conaffinity="1" friction="1.46 0.005 0.0001"/>
+    <geom type="box" pos="-0.26 1.13 0.0028" size="0.24 0.32 0.002" rgba="0.526 0.488 0.213 1" contype="1" conaffinity="1" friction="0.63 0.005 0.0001"/>
+    <geom type="cylinder" pos="1.68 -0.92 0.0055" size="0.16 0.001" rgba="0.557 0.616 0.932 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-0.60 -1.29 0.0055" size="0.08 0.001" rgba="0.839 0.085 0.013 1" contype="0" conaffinity="0"/>
+    <geom type="sphere" pos="-0.73 -1.23 0.052" size="0.052" rgba="0.225 0.838 0.342 1" contype="0" conaffinity="0"/>
+    <geom type="sphere" pos="0.97 -0.03 0.048" size="0.048" rgba="0.148 0.454 0.090 1" contype="0" conaffinity="0"/>
+    <geom type="sphere" pos="-1.15 1.19 0.064" size="0.064" rgba="0.669 0.051 0.774 1" contype="0" conaffinity="0"/>
+    <geom type="sphere" pos="-1.23 0.51 0.067" size="0.067" rgba="0.328 0.640 0.088 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="0.14 -1.49 1.25" size="0.115 0.005 0.107" rgba="0.785 0.468 0.194 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="-1.99 0.80 0.94" size="0.005 0.125 0.124" rgba="0.704 0.479 0.370 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="-1.99 1.16 0.62" size="0.005 0.255 0.158" rgba="0.046 0.438 0.743 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="-0.79 1.49 1.06" size="0.267 0.005 0.162" rgba="0.615 0.768 0.125 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="1.18 1.24 0.40" size="0.18 0.24 0.40" rgba="0.342 0.119 0.726 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="-1.07 -1.26 0.35" size="0.22 0.22 0.35" rgba="0.584 0.178 0.116 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="1.77 1.28 0.37" size="0.23 0.20 0.37" rgba="0.025 0.115 0.666 1" contype="0" conaffinity="0"/>
+    <body name="ball" mocap="true" pos="-0.9 0 0.12"><geom name="ball_geom" type="sphere" size="0.05" rgba="0.70 0.03 0.02 1" contype="0" conaffinity="0"/></body>
+  </worldbody>
+</mujoco>

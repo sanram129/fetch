@@ -9,23 +9,6 @@ import numpy as np
 import time
 import cv2
 
-# Load in the default scene, and create a data object to hold the current scene state
-m = mujoco.MjModel.from_xml_path("scene_rand.xml")
-d = mujoco.MjData(m)
-
-# Start up two cameras, one that goes on the robot (ie. what it sees)
-# and a second to view from afar for debug
-onboard_r = mujoco.Renderer(m, height=480, width=640)
-far_r     = mujoco.Renderer(m, height=360, width=480)
-
-# Frame rates for the two cameras when recording data
-# 10 FPS for the model, 30 for viewing
-ONBOARD_EVERY = int(0.1 / m.opt.timestep)    
-FAR_EVERY     = int(1/30 / m.opt.timestep)  
-
-# Physical frame we are on so we know whether to update
-step = 0
-
 # Distance in metres we want the ball to be away from the camera ideally
 # For now try setting to 15cm
 BALL_OPTIM_DIST = 0.15 
@@ -41,12 +24,6 @@ LEGS = {
 
 LEFT = {"A", "D"}
 
-# Get mujoco's representation of the actuators
-act = {m.joint(m.actuator_trnid[i, 0]).name: i for i in range(m.nu)}
-
-# ID of the ball from scene
-ball_id = m.body("ball").mocapid[0]
-
 # Initialize rng
 rng = np.random.default_rng()
 
@@ -56,11 +33,6 @@ BALL_Z = 0.12
 # Range of positions the ball will be allowed to wander between
 LO = np.array([-1.7, -1.1])
 HI = np.array([-0.4,  1.1])
-
-# Set an initial position and velocity for the ball, as well as what it would do next
-d.mocap_pos[ball_id] = [-0.9, 0.0, BALL_Z]
-ball = {"pos": np.array([-0.9, 0.0]), "vel": np.zeros(2),
-        "goal": rng.uniform(LO, HI), "next": 0.0}
 
 # Accelerometer info
 G = 9.81
@@ -72,17 +44,18 @@ gyro_bias = np.array([-3.5, 1.4, 0.1])
 # Also simulate the joints used by the 12-bit AS5600 encoder the robot will also use
 JOINTS = ["Revolute-16", "Revolute-17", "Revolute-22", "Revolute-23",   # lateral hip movement 
           "Revolute-28", "Revolute-35", "Revolute-36", "Revolute-34",   # forward/backward hip movement
-          "Revolute-31", "Revolute-49", "Revolute-46", "Revolute-43"]   # knees
-qadr = [m.joint(j).qposadr[0] for j in JOINTS]
-LSB = 2*np.pi / 4096                                                  
+          "Revolute-31", "Revolute-49", "Revolute-46", "Revolute-43"]   # knees                                                
 
 # "Read" the joints and add a bit of noise
-def read_joints(rng):
+def read_joints(m, d, rng):
+    qadr = [m.joint(j).qposadr[0] for j in JOINTS]
+    LSB = 2*np.pi / 4096  
+
     q = d.qpos[qadr] + rng.normal(0, 0.002, len(qadr))
     return np.round(q / LSB) * LSB
 
 # Simulate reading the IMU so we have similar types of data to real life
-def read_imu(rng):
+def read_imu(d, rng):
     # MPU6050 reads acceleration in Gs (multiples of 9.81)
     acc = d.sensor("imu_acc").data / G
 
@@ -92,7 +65,7 @@ def read_imu(rng):
     # Simulated jitter found experimentally, roughly 0.01g and 0.15 deg 
     # for accelerometer and gyro, respectively
     acc = acc + rng.normal(0, 0.01, 3)
-    gyro = gyro + gyro_bias_dps + rng.normal(0, 0.15, 3)
+    gyro = gyro + gyro_bias + rng.normal(0, 0.15, 3)
 
     # From the MPU datasheet, convert this to the bit representations (in LSBs)
     # that the MPU6050 actually uses
@@ -103,7 +76,7 @@ def read_imu(rng):
 
 # The algorithm the baseline will use to walk
 # The models will give it a direction and this computes joint positions
-def trot(t, x, y, freq=2.0, hip_amp=0.35, knee_amp=0.45):
+def trot(t, x, y, act, m, freq=2.0, hip_amp=0.35, knee_amp=0.45):
     """x: -1 (left) .. +1 (right), y: -1 (back) .. +1 (forward)."""
     # clamp so we stay at a max speed of 1 on diagonals
     r = np.hypot(x, y)
@@ -170,7 +143,7 @@ def get_target(ball_pos):
     if not ball_pos:
         return 1.0, 1.0
 
-    cx, cy, d = ball_pos
+    cx, cy, diam = ball_pos
 
     # we know the ball's actual radius, so using scaling, we can figure out how far away it is
     CAMERA_Y_FOV = np.radians(38)
@@ -178,7 +151,7 @@ def get_target(ball_pos):
     FOCAL_LEN = (CAMERA_H / 2) / np.tan(CAMERA_Y_FOV / 2)
     BALL_DIAMETER = 0.05 # in metres
 
-    ball_dist = FOCAL_LEN * BALL_DIAMETER / d
+    ball_dist = FOCAL_LEN * BALL_DIAMETER / diam
 
     # Figure out how far to turn based on the ball's x position
     turn_dir = (cx - 320) / 320
@@ -192,20 +165,13 @@ def get_target(ball_pos):
 
     return turn_dir, fwd_dir
 
-# IDs of the main part of the chassis and camera on the robot
-CH = m.body("Chassis_Back_1").id
-CAM = m.camera("onboard").id
-
-# Get horizontal fov (around 49 degrees; made to mimic logitech c270 the real robot will use)
-HFOV = 2 * np.arctan(np.tan(np.radians(38) / 2) * 640 / 480)  
-
 # The teacher controller that always has the ball's position
-def teacher(standoff=0.30, k_turn=1.5, k_fwd=2.0, deadband=0.04):
+def teacher(d, ball_id, ch, cam, standoff=0.30, k_turn=1.5, k_fwd=2.0, deadband=0.04):
 
     # Rotation matrix of the ball relative to the chassis
     # Matmul with the camera's position relative to the ball to get the ball in the camera's coordinate frame
-    R = d.xmat[CH].reshape(3, 3)
-    rel = R.T @ (d.mocap_pos[ball_id] - d.cam_xpos[CAM])
+    R = d.xmat[ch].reshape(3, 3)
+    rel = R.T @ (d.mocap_pos[ball_id] - d.cam_xpos[cam])
 
     # Correct direction as -x is default forwards for the robot model
     ahead, right = -rel[0], rel[1]
@@ -256,58 +222,145 @@ def overlay(frame, res):
     return img
 
 # How we will move the ball around the scene 
-def move_ball(dt, speed=0.2):
+# If random is set to false we must provide a set of coordinates and timestamps to play back
+def move_ball(ball, ball_id, dt, d, speed=0.2, random=True, keyframes=None):
 
-    # If the ball is very close to the goal or it has been long enough,
-    # update the position of the ball
-    to_goal = ball["goal"] - ball["pos"]
-    if d.time > ball["next"] or np.linalg.norm(to_goal) < 0.05:
-        ball["goal"] = rng.uniform(LO, HI)
-
-        # Move it after somewhere between 2 and 5 seconds
-        ball["next"] = d.time + rng.uniform(2.0, 5.0)
+    if random:
+        # If the ball is very close to the goal or it has been long enough,
+        # update the position of the ball
         to_goal = ball["goal"] - ball["pos"]
+        if d.time > ball["next"] or np.linalg.norm(to_goal) < 0.05:
+            ball["goal"] = rng.uniform(LO, HI)
 
-    # Get the target direction vector to head towards the ball without dividing by 0 accidentally
-    want = speed * to_goal / (np.linalg.norm(to_goal) + 1e-9)
+            # Move it after somewhere between 4 and 8 seconds
+            ball["next"] = d.time + rng.uniform(4.0, 8.0)
+            to_goal = ball["goal"] - ball["pos"]
 
-    # Update velocity and position of the ball
-    ball["vel"] += (want - ball["vel"]) * min(1.0, dt / 0.5)
-    ball["pos"] += ball["vel"] * dt
+        # Get the target direction vector to head towards the ball without dividing by 0 accidentally
+        want = speed * to_goal / (np.linalg.norm(to_goal) + 1e-9)
 
-    # Add some jitter horizontally and update position of the ball
-    xy = ball["pos"] + rng.normal(0, 0.002, 2)
-    d.mocap_pos[ball_id] = [xy[0], xy[1], BALL_Z]
+        # Update velocity and position of the ball
+        ball["vel"] += (want - ball["vel"]) * min(1.0, dt / 0.5)
+        ball["pos"] += ball["vel"] * dt
 
-# At the start don't move until we know what's going on
-target = np.zeros(2)
+        # Add some jitter horizontally and update position of the ball
+        xy = ball["pos"] + rng.normal(0, 0.002, 2)
+        d.mocap_pos[ball_id] = [xy[0], xy[1], BALL_Z]
+    else:
+        if keyframes is None:
+            raise ValueError("playback_coords cannot be 'None' if random set to False")
 
-# Mujoco viewer loop
-with mujoco.viewer.launch_passive(m, d) as v:
-    while v.is_running():
-        t0 = time.time()
-        d.ctrl[:] = trot(d.time, target[0], target[1])
-        move_ball(m.opt.timestep)
-        mujoco.mj_step(m, d)
+        # Stop and hold if we finish the sequence
+        t = min(keyframes["t"][-1], d.time)        
 
-        # These two if statements basically just output the current camera view to opencv
-        # for viewing in separate camera feeds or just saving for the model
-        if step % ONBOARD_EVERY == 0:
-            onboard_r.update_scene(d, camera="onboard")
-            onboard = onboard_r.render()             
-            # We can calculate the target based off this image
-            ball_pos = find_ball(onboard)
-            target = teacher()#get_target(ball_pos)
-            cv2.imshow("onboard", overlay(onboard, ball_pos))
-            cv2.waitKey(1)
+        # Interpolate based on current time and keyframes
+        d.mocap_pos[ball_id] = [np.interp(t, keyframes["t"], keyframes["ball"][:, i]) for i in range(3)]
 
-        if step % FAR_EVERY == 0:
-            far_r.update_scene(d, camera="far")
-            cv2.imshow("far", far_r.render()[:, :, ::-1])
-            cv2.waitKey(1)
+# What the recorder calls to create a datapoint
+# Will return the ball positions in an array, along with the path in which camera frames are stored,
+# and IMU and joint data in arrays too
+# If it is run with playback enabled, it will simply play back a scene we give it
+# It can additionally specify whether or not to use the teacher or baseline or primary model
+def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, controller="teacher"):
+    # Things we need to update with a new scene
+    # Load in the default scene, and create a data object to hold the current scene state
+    m = mujoco.MjModel.from_xml_path(scene)
+    d = mujoco.MjData(m)
 
-        # Update frame visually every 25 steps to compute faster 
-        step += 1
-        if step % 25 == 0:
-            v.sync()
-        time.sleep(max(0, m.opt.timestep - (time.time() - t0)))
+    # Start up two cameras, one that goes on the robot (ie. what it sees)
+    # and a second to view from afar for debug
+    onboard_r = mujoco.Renderer(m, height=480, width=640)
+    far_r     = mujoco.Renderer(m, height=360, width=480)
+
+    # Frame rates for the two cameras when recording data
+    # 10 FPS for the model, 30 for viewing
+    ONBOARD_EVERY = int(0.1 / m.opt.timestep)    
+    FAR_EVERY     = int(1/30 / m.opt.timestep)  
+
+    # Get mujoco's representation of the actuators
+    act = {m.joint(m.actuator_trnid[i, 0]).name: i for i in range(m.nu)}
+
+    # ID of the ball from scene
+    ball_id = m.body("ball").mocapid[0]
+
+    # Set an initial position and velocity for the ball, as well as what it would do next
+    d.mocap_pos[ball_id] = [-0.9, 0.0, BALL_Z]
+    ball = {"pos": np.array([-0.9, 0.0]), "vel": np.zeros(2),
+            "goal": rng.uniform(LO, HI), "next": 0.0}
+
+    # IDs of the main part of the chassis and camera on the robot
+    ch = m.body("Chassis_Back_1").id
+    cam = m.camera("onboard").id
+
+    # Physics update step
+    step = 0
+
+    # At the start don't move until we know what's going on
+    target = np.zeros(2)
+
+    # With frames at 10hz we just need to count the num of frames before ending
+    num_frames = 0
+
+    # The logs of data which we return/save afterwards
+    log = old_log if playback else []
+
+    # Mujoco viewer loop
+    with mujoco.viewer.launch_passive(m, d) as v:
+        while v.is_running():
+            t0 = time.time()
+            d.ctrl[:] = trot(d.time, target[0], target[1], act, m)
+            move_ball(ball, ball_id, m.opt.timestep, d, random=(not playback), keyframes=old_log)
+            mujoco.mj_step(m, d)
+
+            # These two if statements basically just output the current camera view to opencv
+            # for viewing in separate camera feeds or just saving for the model
+            if step % ONBOARD_EVERY == 0:
+                onboard_r.update_scene(d, camera="onboard")
+                onboard = onboard_r.render()             
+                # We can calculate the target based off this image
+                ball_pos = find_ball(onboard)
+
+                match controller:
+                    case "teacher":                  
+                        target = teacher(d, ball_id, ch, cam)
+                    case "baseline":
+                        target = get_target(ball_pos)
+                    # Actual model
+                    case "primary":
+                        pass
+
+                # Update the logs every camera frame to sync them up
+                acc, gyro = read_imu(d, rng)
+                if not playback:
+                    log.append(dict(
+                        t=d.time,
+                        img=cv2.resize(onboard, (128, 96)),
+                        acc=acc, gyro=gyro,
+                        q=read_joints(m, d, rng),
+                        label=target,
+                        ball=d.mocap_pos[ball_id].copy(), 
+                    ))
+
+                num_frames += 1 
+
+                cv2.imshow("onboard", overlay(onboard, ball_pos))
+                cv2.waitKey(1)
+
+            if step % FAR_EVERY == 0:
+                far_r.update_scene(d, camera="far")
+                cv2.imshow("far", far_r.render()[:, :, ::-1])
+                cv2.waitKey(1)
+
+            # Update frame visually every 25 steps to compute faster 
+            step += 1
+            if step % 25 == 0:
+                v.sync()
+            time.sleep(max(0, m.opt.timestep - (time.time() - t0)))
+
+            if num_frames == recording_time * 10:
+                break
+
+    return log if not playback else []
+
+if __name__ == '__main__':
+    scene_update_loop("scenes/test_rand_0.xml", recording_time=5, playback=True, old_log=np.load("data/run_scene_0_take_1.npz"), controller="baseline")

@@ -1,5 +1,6 @@
 <mujoco model="scene">
-  <include file="robot_model/Main_Robot-v8/Main_Robot-v8.xml"/>
+  <compiler meshdir=".." />
+  <include file="../robot_model/Main_Robot-v8/Main_Robot-v8.xml"/>
 
   <visual>
     <headlight diffuse=".5 .5 .5" ambient=".3 .3 .3"/>
