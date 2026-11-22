@@ -106,6 +106,7 @@ def make_scene(seed=None, robot="robot_model/Main_Robot-v8/Main_Robot-v8.xml", p
     # Put all the objects made into the xml template, separating them by newlines
     body = "\n    ".join(world)
     xml = f"""<mujoco model="scene_rand">
+    <compiler meshdir=".." />
   <include file="{robot}"/>
   <visual>
     <headlight ambient="{amb:.2f} {amb:.2f} {amb:.2f}" diffuse="{hdif:.2f} {hdif:.2f} {hdif:.2f}" specular="0 0 0"/>
