@@ -302,7 +302,7 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
     num_frames = 0
 
     # The logs of data which we return/save afterwards
-    log = old_log if playback else []
+    log = []
 
     # Mujoco viewer loop
     with mujoco.viewer.launch_passive(m, d) as v:
@@ -341,7 +341,16 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
                         ball=d.mocap_pos[ball_id].copy(), 
                         cam=d.cam_xpos[cam].copy()
                     ))
-
+                # If we are playing it back and likely using a non-teacher controller, we
+                # want to save the ball position, camera position, time, and label 
+                else:
+                    log.append(dict(
+                        t=d.time,
+                        label=target,
+                        ball=d.mocap_pos[ball_id].copy(), 
+                        cam=d.cam_xpos[cam].copy()
+                    ))
+                    
                 num_frames += 1 
 
                 cv2.imshow("onboard", overlay(onboard, ball_pos))
@@ -361,7 +370,7 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
             if num_frames == recording_time * 10:
                 break
 
-    return log if not playback else []
+    return log
 
 if __name__ == '__main__':
     scene_update_loop("scenes/test_rand_0.xml", recording_time=5, playback=True, old_log=np.load("data/run_scene_0_take_1.npz"), controller="baseline")
