@@ -1,7 +1,7 @@
 '''
     This file contains the primary model architecture, which will consist of a CNN,
     along with an RNN after the image is processed, and a few fully-connected layers
-    to finish the network. It willa also contain the training loop and stats code for
+    to finish the network. It will also contain the training loop and stats code for
     model training and validation in terms of the outputs. stats_calc.py will contain
     distance-related calculations.
 '''
@@ -44,8 +44,11 @@ class FetchNN(torch.nn.Module):
         self.final_fc2 = nn.Linear(16, 2)
 
     def forward(self, camera_img, sensor_data):
+        # This is sequential data so we have to consider the 
+        # number of time steps in the input as well as the batch size
         B, T = camera_img.shape[:2]
 
+        # Number of images is batch * time steps
         x = camera_img.flatten(0, 1)
 
         # Convolutional forward pass
@@ -91,6 +94,7 @@ def process_dataset():
     val_data = [runs[i] for i in indices[val_begin:test_begin]]
     test_data = [runs[i] for i in indices[test_begin:]]
 
+    # Calculate standard deviation and mean for better normalization
     train_data_cat = torch.cat([p for _, p, _ in train_data])
     mean, std_dev = train_data_cat.mean(0), train_data_cat.std(0) + 1e-6
 
@@ -104,9 +108,14 @@ def create_dl(ds, mean, std_dev, window=64, stride=16, bs=16, shuffle=False):
 
     for img, joint, label, in ds:
         for i in range(0, len(label) - window  + 1, stride):
+
+            # Images preprocessed in the command below
             img_data.append(img[i:i+window])
+
             # This has to be specially normalized here as joint data, accelerometer, and gyro are on different scales
             joint_data.append((joint[i:i+window] - mean) / std_dev)
+            
+            # labels are already between -1 and 1
             label_data.append(label[i:i+window])
 
     return DataLoader(TensorDataset(torch.stack(img_data), torch.stack(joint_data), torch.stack(label_data)), batch_size=bs, shuffle=shuffle)
@@ -128,14 +137,18 @@ def pred_mean_abs_err(pred, gt):
 # Also get accuracy in terms of whether or not we are facing the right way
 def right_way_accuracy(pred, gt):
     pred, gt = np.asarray(pred), np.asarray(gt)
-    mask = np.abs(gt[:, 0]) > 0.1                 # ignore frames where the target is ~straight
+    
+    # Only check things where we actually had to turn; if less than 0.1 we're basically going straight
+    # and minor fluctuations won't matter that much if we can correct for them
+    mask = np.abs(gt[:, 0]) > 0.1  
     if not mask.any():
-        return float("nan")                       # nothing to score
+        return float("nan")
     return (np.sign(pred[mask, 0]) == np.sign(gt[mask, 0])).mean()
 
 def train(model, train_data, val_data, num_epochs=20, learning_rate=0.001):
+    # Random seed lol
     torch.manual_seed(67)
-    model.to(device)
+    model.to(device) # Move to gpu
 
     # Regression problem so use MSELoss
     criterion = nn.MSELoss()
@@ -155,20 +168,23 @@ def train(model, train_data, val_data, num_epochs=20, learning_rate=0.001):
                 img, sensor, label = img.to(device), sensor.to(device), label.to(device)
                 img = preprocess_image(img)
 
-                out = model(img, sensor)                  # (B, T, 2)
+                # Forward pass, calculate loss
+                out = model(img, sensor)
                 loss = criterion(out, label)
 
+                # Backprop if we're training
                 if training:
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
 
+                # Calculate stats
                 k = label.numel()
                 loss_sum += loss.item() * k
                 ae_sum += (out - label).abs().sum().item()
                 n += k
 
-                # right turn direction? skip frames where the target is ~straight
+                # Skip the almost straight results when we look at if we're turning in the right direction
                 valid = label[..., 0].abs() > 0.1
                 hit += ((out[..., 0].sign() == label[..., 0].sign()) & valid).sum().item()
                 n_sign += valid.sum().item()
@@ -176,8 +192,11 @@ def train(model, train_data, val_data, num_epochs=20, learning_rate=0.001):
         return loss_sum / n, ae_sum / n, hit / max(n_sign, 1)
 
     for epoch in range(num_epochs):
+        # Loss, abs error, and sign accuracy for train and val
         tl, tae, tsa = run_epoch(train_data, True)
         vl, vae, vsa = run_epoch(val_data, False)
+
+        # Print per-epoch stats while training
         for key, v in zip(stats, (tl, tae, tsa, vl, vae, vsa)):
             stats[key].append(v)
         print(f"epoch {epoch+1:2d}/{num_epochs} | loss {tl:.4f}/{vl:.4f} | "
@@ -185,8 +204,10 @@ def train(model, train_data, val_data, num_epochs=20, learning_rate=0.001):
 
     return model, stats
 
+# Plot loss, mean abs error, and sign accuracy per epoch
 def plot_hist(stats):
     fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+    
     for ax, name, title in zip(axes,
                                ("loss", "abs_err", "sign_acc"),
                                ("MSE loss", "Mean abs error", "Turn-sign accuracy")):
@@ -196,6 +217,7 @@ def plot_hist(stats):
         ax.set_xlabel("epoch")
         ax.legend()
         ax.grid(alpha=0.3)
+
     plt.tight_layout()
     plt.show()
 
@@ -211,12 +233,14 @@ if __name__ == '__main__':
     test_dl = create_dl(test_data, mean, std_dev, stride=32, shuffle=False)
 
     # Actually train the model, then plot the data after all epochs
-    fetch_model, stats = train(fetch_model, train_dl, val_dl, num_epochs=10, learning_rate=0.001)
+    lr = 0.001
+    num_epochs = 10
+    fetch_model, stats = train(fetch_model, train_dl, val_dl, num_epochs=num_epochs, learning_rate=lr)
     plot_hist(stats)
 
     # Save the model
     torch.save({
         "model": fetch_model.state_dict(),
-        "mu": mean, "sd": std_dev,                       
+        "mean": mean, "std_dev": std_dev,                       
         "rnn_hidden_size": 64,
-    }, "fetch_nn_10_epochs_0001_lr.pt")
+    }, f"fetch_nn_{num_epochs}_epochs_{lr}_lr.pt")
