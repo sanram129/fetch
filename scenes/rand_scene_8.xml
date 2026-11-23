@@ -2,33 +2,38 @@
     <compiler meshdir=".." />
   <include file="../robot_model/Main_Robot-v8/Main_Robot-v8.xml"/>
   <visual>
-    <headlight ambient="0.35 0.35 0.35" diffuse="0.29 0.29 0.29" specular="0 0 0"/>
+    <headlight ambient="0.27 0.27 0.27" diffuse="0.27 0.27 0.27" specular="0 0 0"/>
     <global azimuth="130" elevation="-25"/>
     <map znear="0.005"/>
   </visual>
   <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.772 0.605 0.769" rgb2="0.180 0.211 0.187" width="512" height="3072"/>
-    <texture type="2d" name="tile" builtin="checker" width="300" height="300" rgb1="0.779 0.586 0.796" rgb2="0.523 0.461 0.579"/>
-    <material name="floor" texture="tile" texrepeat="10 10" reflectance="0.05"/>
+    <texture type="skybox" builtin="gradient" rgb1="0.622 0.906 0.952" rgb2="0.222 0.176 0.129" width="512" height="3072"/>
+    
+    <material name="floor" rgba="0.704 0.521 0.505 1"/>
   </asset>
   <worldbody>
-    <light pos="0.79 -0.62 2.79" dir="-0.11 0.13 -1" diffuse="0.30 0.31 0.31" castshadow="true"/>
-    <light pos="0.13 0.52 2.59" dir="0.14 0.04 -1" diffuse="0.38 0.39 0.38" castshadow="true"/>
-    <light pos="0.44 0.14 2.20" dir="0.05 0.08 -1" diffuse="0.34 0.33 0.32" castshadow="true"/>
-    <geom name="floor" type="plane" size="2.0 1.5 0.05" material="floor" contype="1" conaffinity="1" friction="1.15 0.005 0.0001"/>
-    <geom name="wall_a" type="box" pos="-2.05 0 0.75" size="0.05 1.6 0.75" rgba="0.368 0.272 0.458 1" contype="1" conaffinity="1"/>
-    <geom name="wall_b" type="box" pos="2.05 0 0.75" size="0.05 1.6 0.75" rgba="0.721 0.657 0.474 1" contype="1" conaffinity="1"/>
-    <geom name="wall_c" type="box" pos="0 -1.55 0.75" size="2.1 0.05 0.75" rgba="0.474 0.750 0.425 1" contype="1" conaffinity="1"/>
-    <geom name="wall_d" type="box" pos="0 1.55 0.75" size="2.1 0.05 0.75" rgba="0.760 0.773 0.649 1" contype="1" conaffinity="1"/>
-    <geom type="box" pos="1.67 0.82 0.0020" size="0.21 0.35 0.002" rgba="0.472 0.026 0.672 1" contype="1" conaffinity="1" friction="0.85 0.005 0.0001"/>
-    <geom type="cylinder" pos="0.88 0.90 0.0055" size="0.16 0.001" rgba="0.548 0.059 0.535 1" contype="0" conaffinity="0"/>
-    <geom type="cylinder" pos="0.65 0.95 0.0055" size="0.17 0.001" rgba="0.485 0.360 0.711 1" contype="0" conaffinity="0"/>
-    <geom type="sphere" pos="0.22 0.95 0.043" size="0.043" rgba="0.304 0.236 0.519 1" contype="0" conaffinity="0"/>
-    <geom type="box" pos="-0.13 -1.49 0.96" size="0.258 0.005 0.201" rgba="0.879 0.507 0.140 1" contype="0" conaffinity="0"/>
-    <geom type="box" pos="1.99 1.25 0.47" size="0.005 0.138 0.237" rgba="0.341 0.564 0.220 1" contype="0" conaffinity="0"/>
-    <geom type="box" pos="-0.94 -1.33 0.28" size="0.15 0.15 0.28" rgba="0.238 0.555 0.098 1" contype="0" conaffinity="0"/>
-    <geom type="box" pos="-1.85 -0.61 0.30" size="0.13 0.14 0.30" rgba="0.552 0.280 0.131 1" contype="0" conaffinity="0"/>
-    <geom type="box" pos="-0.69 1.36 0.42" size="0.12 0.12 0.42" rgba="0.618 0.912 0.845 1" contype="0" conaffinity="0"/>
-    <body name="ball" mocap="true" pos="-0.9 0 0.12"><geom name="ball_geom" type="sphere" size="0.05" rgba="0.74 0.16 0.16 1" contype="0" conaffinity="0"/></body>
+    <light pos="0.92 0.64 2.49" dir="-0.06 -0.26 -1" diffuse="0.28 0.32 0.28" castshadow="false"/>
+    <geom name="floor" type="plane" size="2.0 1.5 0.05" material="floor" contype="1" conaffinity="1" friction="0.66 0.005 0.0001"/>
+    <geom name="wall_a" type="box" pos="-2.05 0 0.75" size="0.05 1.6 0.75" rgba="0.325 0.522 0.486 1" contype="1" conaffinity="1"/>
+    <geom name="wall_b" type="box" pos="2.05 0 0.75" size="0.05 1.6 0.75" rgba="0.006 0.289 0.442 1" contype="1" conaffinity="1"/>
+    <geom name="wall_c" type="box" pos="0 -1.55 0.75" size="2.1 0.05 0.75" rgba="0.919 0.132 0.412 1" contype="1" conaffinity="1"/>
+    <geom name="wall_d" type="box" pos="0 1.55 0.75" size="2.1 0.05 0.75" rgba="0.363 0.043 0.626 1" contype="1" conaffinity="1"/>
+    <geom type="box" pos="-1.12 0.21 0.0020" size="0.18 0.40 0.002" rgba="0.443 0.369 0.005 1" contype="1" conaffinity="1" friction="1.21 0.005 0.0001"/>
+    <geom type="box" pos="1.34 -1.30 0.0024" size="0.47 0.32 0.002" rgba="0.595 0.171 0.226 1" contype="1" conaffinity="1" friction="0.60 0.005 0.0001"/>
+    <geom type="box" pos="1.35 0.13 0.0028" size="0.21 0.23 0.002" rgba="0.452 0.929 0.755 1" contype="1" conaffinity="1" friction="0.72 0.005 0.0001"/>
+    <geom type="cylinder" pos="-0.09 0.98 0.0055" size="0.25 0.001" rgba="0.397 0.472 0.804 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="0.67 -0.29 0.0055" size="0.22 0.001" rgba="0.124 0.112 0.713 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="1.64 1.05 0.0055" size="0.15 0.001" rgba="0.466 0.040 0.614 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-1.36 1.26 0.0055" size="0.25 0.001" rgba="0.574 0.816 0.476 1" contype="0" conaffinity="0"/>
+    <geom type="cylinder" pos="-0.56 1.27 0.0055" size="0.14 0.001" rgba="0.938 0.192 0.368 1" contype="0" conaffinity="0"/>
+    <geom type="sphere" pos="1.24 -0.52 0.062" size="0.062" rgba="0.625 0.473 0.896 1" contype="0" conaffinity="0"/>
+    <geom type="sphere" pos="1.68 0.94 0.041" size="0.041" rgba="0.506 0.675 0.849 1" contype="0" conaffinity="0"/>
+    <geom type="sphere" pos="0.96 1.01 0.063" size="0.063" rgba="0.378 0.596 0.279 1" contype="0" conaffinity="0"/>
+    <geom type="sphere" pos="-0.80 0.28 0.065" size="0.065" rgba="0.357 0.405 0.940 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="-0.13 -1.49 1.05" size="0.285 0.005 0.204" rgba="0.788 0.695 0.419 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="0.32 -1.49 0.45" size="0.164 0.005 0.208" rgba="0.364 0.707 0.564 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="1.83 -1.14 0.31" size="0.15 0.20 0.31" rgba="0.154 0.404 0.331 1" contype="0" conaffinity="0"/>
+    <geom type="box" pos="1.84 1.06 0.27" size="0.14 0.18 0.27" rgba="0.564 0.503 0.515 1" contype="0" conaffinity="0"/>
+    <body name="ball" mocap="true" pos="-0.9 0 0.12"><geom name="ball_geom" type="sphere" size="0.05" rgba="0.77 0.16 0.19 1" contype="0" conaffinity="0"/></body>
   </worldbody>
 </mujoco>

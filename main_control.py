@@ -8,6 +8,11 @@ import mujoco.viewer
 import numpy as np
 import time
 import cv2
+import torch
+from primary_model import FetchNN
+import torch.nn.functional as F
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Distance in metres we want the ball to be away from the camera ideally
 # For now try setting to 15cm
@@ -256,6 +261,35 @@ def move_ball(ball, ball_id, dt, d, speed=0.2, random=True, keyframes=None):
         # Interpolate based on current time and keyframes
         d.mocap_pos[ball_id] = [np.interp(t, keyframes["t"], keyframes["ball"][:, i]) for i in range(3)]
 
+# Load in the pytorch model we want to use
+def load_primary_model(model_file):
+    ckpt = torch.load(model_file, map_location=device)
+    model = FetchNN(rnn_hidden_size=ckpt["rnn_hidden_size"]).to(device)
+    model.load_state_dict(ckpt["model"])
+    model.eval()
+
+    mean, std_dev = ckpt["mean"].to(device), ckpt["std_dev"].to(device)
+
+    return model, mean, std_dev
+
+# How we will run the model while doing an example
+def policy_step(model, onboard, acc, gyro, joints, mean, std_dev):
+    # Image data processing
+    # We have to resize twice as it was during training
+    img = cv2.resize(onboard, (128, 96), interpolation=cv2.INTER_AREA)       # (96, 128, 3) uint8, still RGB
+    x = torch.from_numpy(img).to(device).permute(2, 0, 1).float() / 255      # (3, 96, 128)
+    x = F.interpolate(x[None], size=(96, 96), mode="bilinear",
+                      align_corners=False, antialias=True)                   # (1, 3, 96, 96)
+    x = x[:, None]                                                           # (1, 1, 3, 96, 96): batch, time
+
+    # Normalize the sensor data as well and pack into a single list to input to the model
+    s = torch.tensor([*acc, *gyro, *joints], dtype=torch.float32, device=device)
+    s = ((s - mean) / std_dev)[None, None]                                          # (1, 1, 18)
+
+    # Run model on GPU without calculating gradients, then move to cpu to input to sim
+    with torch.no_grad():
+        return model(x, s)[0, 0].cpu().numpy() 
+
 # What the recorder calls to create a datapoint
 # Will return the ball positions in an array, along with the path in which camera frames are stored,
 # and IMU and joint data in arrays too
@@ -266,6 +300,9 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
     # Load in the default scene, and create a data object to hold the current scene state
     m = mujoco.MjModel.from_xml_path(scene)
     d = mujoco.MjData(m)
+
+    # Load the primary model
+    model, mean, std_dev = load_primary_model("fetch_nn_10_epochs_0001_lr.pt") if controller == "primary" else None
 
     # Start up two cameras, one that goes on the robot (ie. what it sees)
     # and a second to view from afar for debug
@@ -302,7 +339,7 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
     num_frames = 0
 
     # The logs of data which we return/save afterwards
-    log = old_log if playback else []
+    log = []
 
     # Mujoco viewer loop
     with mujoco.viewer.launch_passive(m, d) as v:
@@ -320,6 +357,8 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
                 # We can calculate the target based off this image
                 ball_pos = find_ball(onboard)
 
+                acc, gyro = read_imu(d, rng)
+
                 match controller:
                     case "teacher":                  
                         target = teacher(d, ball_id, ch, cam)
@@ -327,10 +366,10 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
                         target = get_target(ball_pos)
                     # Actual model
                     case "primary":
-                        pass
+                        with torch.no_grad():
+                            target = policy_step(model, onboard, acc, gyro, read_joints(m, d, rng), mean, std_dev)
 
                 # Update the logs every camera frame to sync them up
-                acc, gyro = read_imu(d, rng)
                 if not playback:
                     log.append(dict(
                         t=d.time,
@@ -339,8 +378,18 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
                         q=read_joints(m, d, rng),
                         label=target,
                         ball=d.mocap_pos[ball_id].copy(), 
+                        cam=d.cam_xpos[cam].copy()
                     ))
-
+                # If we are playing it back and likely using a non-teacher controller, we
+                # want to save the ball position, camera position, time, and label 
+                else:
+                    log.append(dict(
+                        t=d.time,
+                        label=target,
+                        ball=d.mocap_pos[ball_id].copy(), 
+                        cam=d.cam_xpos[cam].copy()
+                    ))
+                    
                 num_frames += 1 
 
                 cv2.imshow("onboard", overlay(onboard, ball_pos))
@@ -360,7 +409,7 @@ def scene_update_loop(scene, recording_time=30, playback=False, old_log=None, co
             if num_frames == recording_time * 10:
                 break
 
-    return log if not playback else []
+    return log
 
 if __name__ == '__main__':
-    scene_update_loop("scenes/test_rand_0.xml", recording_time=5, playback=True, old_log=np.load("data/run_scene_0_take_1.npz"), controller="baseline")
+    scene_update_loop("scenes/rand_scene_2.xml", recording_time=30, playback=True, old_log=np.load("data/run_scene_0_take_3.npz"), controller="primary")
